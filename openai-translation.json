@@ -1,0 +1,28 @@
+{
+  "BaseUrl": "https://api.openai.com/v1",
+  "ApiKey": "",
+  "ApiKeyEnvironmentVariable": "OPENAI_API_KEY",
+  "Model": "gpt-4o-mini",
+  "SystemPrompt": "Translate the user's text from {source} to {target}. Return only the translated text. Preserve meaning, tone, formatting, and line breaks.",
+  "Temperature": 0.0,
+  "TimeoutSeconds": 25,
+  "MaxInputCharacters": 12000,
+  "AllowInsecureTls": false,
+  "AllowInsecureHttp": false,
+  "Socks5": {
+    "Enabled": false,
+    "Host": "127.0.0.1",
+    "Port": 1080,
+    "Username": "",
+    "Password": ""
+  },
+  "Headers": {},
+  "Vision": {
+    "Enabled": true,
+    "Model": "gpt-4o-mini",
+    "Prompt": "Transcribe all readable text in the image exactly. Preserve reading order and line breaks. Do not translate, explain, summarize, or add Markdown. If there is no readable text, return exactly <NO_TEXT>.",
+    "Detail": "high",
+    "MaxTokens": 2048,
+    "MaxImageBytes": 10485760
+  }
+}
