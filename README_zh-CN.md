@@ -94,7 +94,14 @@ VRHF 在调用 VLM 前仍会执行原有流程：在二值图中寻找四个边�
 - `VRHandsFrame_Data/Managed/VRHF.OpenAIAdapter.dll`
 - `VRHandsFrame_Data/StreamingAssets/config/openai-translation.json`
 
-`Assembly-CSharp.dll` 中将 `HandsFrameClient.WebClient.GetGASUrl()` 改为翻译适配器入口，并将 `PostToDriveOCR` 使用的 `DriveOCRUrl` 改为 VLM OCR 入口；MS OCR 和 Google Vision 分支保持不变。原文件已备份为：
+`Assembly-CSharp.dll` 的 IL 改动：
+
+- 将 `HandsFrameClient.WebClient.GetGASUrl()` 改为翻译适配器入口。
+- 将 `PostToDriveOCR` 使用的 `DriveOCRUrl` 改为 VLM OCR 入口，并将 OCR 超时上限提高至 300 秒。
+- 修复 VRChat OSC Chatbox 延迟：在 `VRHandsFrameVariableFrame.<TakeHandsFrame>d__35` 中，翻译结果写入 `OSCText` 时同步将 `OSCTimer` 设为 `10f`。这消除了原程序硬编码的 10 秒倒计时，使得翻译画面一显示，Chatbox 消息立即同步发送到 VRChat（超过 140 字符的长文本仍按 10 秒翻页）。
+- MS OCR 和 Google Vision 分支保持不变。
+
+原文件已备份为：
 
 `VRHandsFrame_Data/Managed/Assembly-CSharp.dll.vrhf-original`
 

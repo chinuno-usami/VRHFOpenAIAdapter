@@ -265,6 +265,7 @@ Removing the adapter config file is optional; VRHF ignores it when the DLL is no
 
 - `HandsFrameClient.WebClient.GetGASUrl()` → calls `VRHF.OpenAIAdapter.Bridge.GetUrl()` (translation).
 - `PostToDriveOCR` state machine → loads URL from `Bridge.GetOcrUrl()` instead of `HandsFrameConstants.DriveOCRUrl`; OCR UnityWebRequest timeout set to 300 s.
+- `VRHandsFrameVariableFrame.<TakeHandsFrame>d__35` → initializes `OSCTimer = 10f` when `OSCText` is set upon translation completion, eliminating the hardcoded 10-second delay for the first VRChat OSC chatbox message (subsequent >140 char paging remains at 10 s intervals).
 - MS OCR and Google Vision code paths are **not** modified.
 
 ---

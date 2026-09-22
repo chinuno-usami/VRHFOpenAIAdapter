@@ -7,6 +7,7 @@ using Mono.Cecil.Cil;
 internal static class PatchAssembly
 {
     private const string WebClientTypeName = "HandsFrameClient.WebClient";
+    private const string VariableFrameTypeName = "VRHandsFrameVariableFrame";
     private const string BridgeTypeName = "VRHF.OpenAIAdapter.Bridge";
 
     public static int Main(string[] args)
@@ -33,6 +34,8 @@ internal static class PatchAssembly
         {
             TypeDefinition webClient = target.MainModule.Types.SingleOrDefault(t => t.FullName == WebClientTypeName);
             if (webClient == null) throw new InvalidOperationException(WebClientTypeName + " was not found.");
+            TypeDefinition variableFrame = target.MainModule.Types.SingleOrDefault(t => t.FullName == VariableFrameTypeName);
+            if (variableFrame == null) throw new InvalidOperationException(VariableFrameTypeName + " was not found.");
             TypeDefinition bridge = adapter.MainModule.Types.SingleOrDefault(t => t.FullName == BridgeTypeName);
             if (bridge == null) throw new InvalidOperationException(BridgeTypeName + " was not found.");
 
@@ -43,10 +46,11 @@ internal static class PatchAssembly
 
             bool translationChanged = PatchTranslationUrl(webClient, importedGetUrl);
             bool ocrChanged = PatchDriveOcr(webClient, importedGetOcrUrl);
-            changed = translationChanged || ocrChanged;
+            bool oscChanged = PatchOscDelay(variableFrame);
+            changed = translationChanged || ocrChanged || oscChanged;
             if (!changed)
             {
-                Console.WriteLine("Assembly is already patched for translation and VLM OCR.");
+                Console.WriteLine("Assembly is already patched for translation, VLM OCR, and OSC chatbox delay.");
                 return 0;
             }
 
@@ -62,7 +66,7 @@ internal static class PatchAssembly
 
         File.Delete(targetPath);
         File.Move(temporaryPath, targetPath);
-        Console.WriteLine("Patched translation and VLM OCR: " + targetPath);
+        Console.WriteLine("Patched translation, VLM OCR, and OSC chatbox delay: " + targetPath);
         return 0;
     }
 
@@ -131,6 +135,52 @@ internal static class PatchAssembly
             throw new InvalidOperationException("Unexpected PostToDriveOCR timeout IL.");
 
         return changed;
+    }
+
+    private static bool PatchOscDelay(TypeDefinition variableFrame)
+    {
+        TypeDefinition stateMachine = variableFrame.NestedTypes.SingleOrDefault(t => t.Name == "<TakeHandsFrame>d__35");
+        if (stateMachine == null) throw new InvalidOperationException("TakeHandsFrame state machine was not found.");
+        MethodDefinition moveNext = stateMachine.Methods.SingleOrDefault(m => m.Name == "MoveNext");
+        if (moveNext == null) throw new InvalidOperationException("TakeHandsFrame.MoveNext was not found.");
+
+        FieldDefinition oscTimerField = variableFrame.Fields.SingleOrDefault(f => f.Name == "OSCTimer");
+        if (oscTimerField == null) throw new InvalidOperationException("VRHandsFrameVariableFrame.OSCTimer was not found.");
+
+        Instruction oscTextStore = moveNext.Body.Instructions.FirstOrDefault(i =>
+            i.OpCode == OpCodes.Stfld &&
+            i.Operand is FieldReference fr &&
+            fr.Name == "OSCText" &&
+            i.Previous != null &&
+            i.Previous.OpCode == OpCodes.Ldfld &&
+            i.Previous.Operand is FieldReference respData &&
+            respData.Name == "responseData");
+
+        if (oscTextStore == null)
+            throw new InvalidOperationException("Expected OSCText store after translation responseData, but none found.");
+
+        Instruction next = oscTextStore.Next;
+        if (next != null &&
+            (next.OpCode == OpCodes.Ldloc_1 || next.OpCode == OpCodes.Ldloc) &&
+            next.Next != null &&
+            next.Next.OpCode == OpCodes.Ldc_R4 &&
+            next.Next.Next != null &&
+            next.Next.Next.OpCode == OpCodes.Stfld &&
+            next.Next.Next.Operand is FieldReference nextFr &&
+            nextFr.Name == "OSCTimer")
+        {
+            return false;
+        }
+
+        ILProcessor il = moveNext.Body.GetILProcessor();
+        Instruction loadTarget = il.Create(OpCodes.Ldloc_1);
+        Instruction loadTimer = il.Create(OpCodes.Ldc_R4, 10.0f);
+        Instruction storeTimer = il.Create(OpCodes.Stfld, oscTimerField);
+
+        il.InsertAfter(oscTextStore, loadTarget);
+        il.InsertAfter(loadTarget, loadTimer);
+        il.InsertAfter(loadTimer, storeTimer);
+        return true;
     }
 
     private static bool CallsBridge(MethodDefinition method, string methodName)
